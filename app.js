@@ -468,6 +468,7 @@ const presents = [
 ];
 treeDecorations.forEach(object => {
   object.userData.revealHeight = THREE.MathUtils.clamp((object.position.y + HEIGHT * .5) / HEIGHT, 0, 1);
+  object.userData.revealY = object.position.y;
   object.userData.revealScale = object.scale.clone();
 });
 
@@ -1208,12 +1209,14 @@ function animate() {
   branchLines.visible = treeVisible;
   treeDecorations.forEach(object => {
     if (state.charmPhase === 'formingTree') {
-      const p = THREE.MathUtils.clamp((treeFormationProgress - object.userData.revealHeight) / .08, 0, 1);
+      const p = THREE.MathUtils.clamp((treeFormationProgress - object.userData.revealHeight) / .16, 0, 1);
       const reveal = p * p * (3 - 2 * p);
       object.visible = reveal > .001;
+      object.position.y = object.userData.revealY - .28 * (1 - reveal);
       object.scale.copy(object.userData.revealScale).multiplyScalar(reveal);
     } else {
       object.visible = treeVisible;
+      object.position.y = object.userData.revealY;
       object.scale.copy(object.userData.revealScale);
     }
   });
@@ -1295,7 +1298,7 @@ function animate() {
     if (state.charmPhase === 'formingTree') {
       const height = THREE.MathUtils.clamp((home[j + 1] + HEIGHT * .5) / HEIGHT, 0, 1);
       const local = THREE.MathUtils.clamp((treeFormationProgress - height * .72) / .28, 0, 1);
-      pointMix = local * local * (3 - 2 * local);
+      pointMix = 1 - local * local * (3 - 2 * local);
     }
     const shimmer = 1 + .04 * Math.sin(time * 1.5 + phases[i]);
     current[j] = (home[j] * (1 - pointMix) + scatter[j] * pointMix) * shimmer;
