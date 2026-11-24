@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10090d">
+  <title>给最喜欢的你 · 星愿圣诞树</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=2">
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","@mediapipe/tasks-vision":"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs"}}
+  </script>
+</head>
+<body>
+  <main class="experience" id="experience">
+    <canvas id="scene" aria-label="粒子雾、英文祝福、粒子爱心与圣诞树互动场景"></canvas>
+    <div class="ambient-grain" aria-hidden="true"></div>
+
+    <header class="topline">
+      <a class="wordmark" href="#" aria-label="星愿圣诞树首页">
+        <span class="wordmark-star">✦</span>
+        <span>OUR LITTLE UNIVERSE</span>
+      </a>
+      <div class="top-actions">
+        <span class="year-tag">DECEMBER · 2026</span>
+        <button class="camera-button" id="cameraToggle" type="button" aria-pressed="false">
+          <span class="live-dot" id="cameraDot"></span>
+          <span id="cameraLabel">开启手势</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="dedication" aria-label="圣诞寄语">
+      <p class="eyebrow">A CHRISTMAS WISH FOR YOU</p>
+      <h1 id="titleText">给最喜欢的你</h1>
+      <p class="dedication-copy" id="messageText">把这一年的星光，都留给你。</p>
+      <div class="hairline"><span></span></div>
+      <p class="small-note">愿每一个平凡的日子，都有你在身边。</p>
+      <button class="text-action" id="editMessage" type="button">写一段只属于我们的寄语 <span aria-hidden="true">↗</span></button>
+    </section>
+
+    <div class="scene-caption" id="sceneCaption" aria-live="polite">
+      <span class="caption-index" id="photoIndex">NO. 00</span>
+      <span class="caption-name" id="photoName">星光正为你亮起</span>
+    </div>
+
+    <aside class="gesture-preview" id="gesturePreview" aria-label="摄像头手势预览" hidden>
+      <div class="preview-heading"><span>GESTURE CAM</span><span class="preview-status" id="previewStatus">已暂停</span></div>
+      <div class="camera-view">
+        <video id="cameraVideo" autoplay muted playsinline></video>
+        <div class="camera-placeholder" id="cameraPlaceholder">
+          <span class="camera-orbit" aria-hidden="true"></span>
+          <span>手势画面只在此设备处理</span>
+        </div>
+        <canvas id="handOverlay"></canvas>
+      </div>
+      <p class="gesture-readout" id="gestureReadout">捏合下一步/下一张 · 握拳聚合 · 张掌散开</p>
+    </aside>
+
+    <div class="photo-count" id="photoCount" aria-live="polite"><span class="count-number">00</span><span>张回忆</span></div>
+
+    <footer class="toolbar" aria-label="圣诞树控制">
+      <div class="toolbar-group primary-tools">
+        <label class="tool-button upload-button" for="photoInput">
+          <span class="tool-plus" aria-hidden="true">+</span><span>加入照片</span>
+        </label>
+        <input id="photoInput" type="file" accept="image/*" multiple hidden>
+        <button class="tool-button" id="cyclePhoto" type="button" disabled><span class="tool-symbol" aria-hidden="true">◌</span><span>翻看照片</span></button>
+        <button class="tool-button delete-photo" id="removePhoto" type="button" aria-label="移除当前照片" disabled><span class="tool-symbol" aria-hidden="true">×</span><span class="delete-label">移除</span></button>
+      </div>
+      <div class="toolbar-divider" aria-hidden="true"></div>
+      <div class="toolbar-group motion-tools">
+        <button class="tool-button" id="bloomTree" type="button" aria-pressed="false"><span class="tool-symbol" aria-hidden="true">✧</span><span>绽放</span></button>
+        <button class="tool-button" id="gatherTree" type="button" aria-pressed="true"><span class="tool-symbol" aria-hidden="true">✦</span><span>聚合</span></button>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <button class="tool-button message-tool" id="messageButton" type="button"><span>寄语</span></button>
+      <div class="toolbar-hint"><span class="keycap">捏合</span> 下一步 · 单击备用</div>
+    </footer>
+
+    <dialog class="message-dialog" id="messageDialog">
+      <form method="dialog" id="messageForm">
+        <p class="eyebrow">A NOTE FROM THE HEART</p>
+        <h2>写给她的寄语</h2>
+        <label class="field-label" for="recipientInput">称呼</label>
+        <input id="recipientInput" name="recipient" maxlength="18" value="最喜欢的你" autocomplete="off">
+        <label class="field-label" for="noteInput">想对她说的话</label>
+        <textarea id="noteInput" name="note" rows="3" maxlength="80">把这一年的星光，都留给你。</textarea>
+        <div class="dialog-actions">
+          <button class="dialog-cancel" id="cancelMessage" type="button">先不改</button>
+          <button class="dialog-save" id="saveMessage" type="submit">保存这份心意</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+  <script type="module" src="app.js?v=38"></script>
+</body>
+</html>
