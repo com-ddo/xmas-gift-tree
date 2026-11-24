@@ -1208,7 +1208,7 @@ function animate() {
   branchLines.visible = treeVisible;
   treeDecorations.forEach(object => {
     if (state.charmPhase === 'formingTree') {
-      const p = THREE.MathUtils.clamp((treeFormationProgress - object.userData.revealHeight + .08) / .08, 0, 1);
+      const p = THREE.MathUtils.clamp((treeFormationProgress - object.userData.revealHeight) / .08, 0, 1);
       const reveal = p * p * (3 - 2 * p);
       object.visible = reveal > .001;
       object.scale.copy(object.userData.revealScale).multiplyScalar(reveal);
