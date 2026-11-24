@@ -466,6 +466,10 @@ const presents = [
   makePresent({ x: 2.0, y: -5.02, z: 4.18, width: .96, height: .82, depth: .82, color: '#36704f', ribbon: '#d8b670' }),
   makePresent({ x: .12, y: -5.32, z: 4.55, width: .7, height: .58, depth: .64, color: '#bd8750', ribbon: '#f0ddba' }),
 ];
+treeDecorations.forEach(object => {
+  object.userData.revealHeight = THREE.MathUtils.clamp((object.position.y + HEIGHT * .5) / HEIGHT, 0, 1);
+  object.userData.revealScale = object.scale.clone();
+});
 
 const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: '#ffca75', transparent: true, opacity: .7, depthWrite: false, blending: THREE.AdditiveBlending }));
 halo.position.set(0, HEIGHT * .5 + .25, 0);
@@ -850,11 +854,11 @@ async function waitForFormation(phase, run) {
 async function runStoryPlayback(run) {
   scatterParticles(true);
   showToast('演出即将开始');
-  if (!await waitPlayback(1800, run)) return;
+  if (!await waitPlayback(1400, run)) return;
   beginGreeting();
-  if (!await waitForFormation('formingGreeting', run) || !await waitPlayback(1500, run)) return;
+  if (!await waitForFormation('formingGreeting', run) || !await waitPlayback(1800, run)) return;
   beginHeartCharm();
-  if (!await waitForFormation('formingHeart', run) || !await waitPlayback(2200, run)) return;
+  if (!await waitForFormation('formingHeart', run) || !await waitPlayback(1600, run)) return;
   launchTreeReveal();
   if (!await waitForFormation('formingTree', run)) return;
   if (run === playbackRun) {
@@ -1017,8 +1021,8 @@ function actOnGesture(g) {
   setGestureText(gestureLabel(g));
   $('#previewStatus').textContent = `识别到${g === 'open' ? '张掌' : g === 'fist' ? '握拳' : g === 'pinch' ? '捏合' : '手势'}`;
   if (now - lastGestureAction < 480) return;
-  if (g === 'fist') gatherParticles();
-  if (g === 'open') scatterParticles();
+  if (g === 'fist') { cancelPlayback(); gatherParticles(); }
+  if (g === 'open') { cancelPlayback(); scatterParticles(); }
   if (g === 'pinch') advanceScene();
   lastGestureAction = now;
 }
@@ -1161,7 +1165,7 @@ function animate() {
   aura.material.opacity = .13 + .06 * pulse;
   const mix = state.spread;
   if (!playbackPaused && ['formingGreeting', 'formingHeart', 'formingTree'].includes(state.charmPhase)) {
-    const duration = state.charmPhase === 'formingGreeting' ? 2.8 : state.charmPhase === 'formingHeart' ? 3.4 : 10.5;
+    const duration = state.charmPhase === 'formingGreeting' ? 2.6 : state.charmPhase === 'formingHeart' ? 3 : 7.5;
     state.textProgress = Math.min(1, state.textProgress + delta / duration);
     if (state.textProgress >= 1) {
       if (state.charmPhase === 'formingHeart') {
@@ -1184,11 +1188,15 @@ function animate() {
   else if (['greeting', 'formingHeart', 'heart'].includes(state.charmPhase)) pointMaterial.opacity = .3;
   else pointMaterial.opacity = .91;
   const formationProgress = THREE.MathUtils.clamp(1 - state.spread, 0, 1);
-  const treeFormationProgress = state.charmPhase === 'formingTree' ? state.textProgress : formationProgress;
+  const treeDissolveDelay = state.treeRevealFromHeart ? .18 : 0;
+  const treeFormationProgress = state.charmPhase === 'formingTree'
+    ? THREE.MathUtils.clamp((state.textProgress - treeDissolveDelay) / (1 - treeDissolveDelay), 0, 1)
+    : formationProgress;
+  const dissolveProgress = THREE.MathUtils.smoothstep(state.textProgress, 0, .18);
   const showCharm = ['formingGreeting', 'greeting', 'formingHeart', 'heart', 'formingTree'].includes(state.charmPhase);
   const treeParticlesVisible = ['scattered', 'formingGreeting', 'formingTree', 'idle', 'tree'].includes(state.charmPhase);
   const treeReveal = state.charmPhase === 'formingTree'
-    ? THREE.MathUtils.smoothstep(state.textProgress, .04, .98)
+    ? THREE.MathUtils.smoothstep(treeFormationProgress, .03, .98)
     : state.charmPhase === 'idle' || state.charmPhase === 'tree' ? 1 : 0;
   const treeVisible = treeReveal > .72;
   const photosVisible = state.charmPhase === 'idle' || state.charmPhase === 'tree';
@@ -1198,10 +1206,23 @@ function animate() {
   ribbonPoints.visible = treeReveal > .01;
   ribbonMaterial.opacity = (.77 + .13 * Math.sin(time * 1.7)) * treeReveal;
   branchLines.visible = treeVisible;
-  treeDecorations.forEach(object => { object.visible = treeVisible; });
+  treeDecorations.forEach(object => {
+    if (state.charmPhase === 'formingTree') {
+      const p = THREE.MathUtils.clamp((treeFormationProgress - object.userData.revealHeight + .08) / .08, 0, 1);
+      const reveal = p * p * (3 - 2 * p);
+      object.visible = reveal > .001;
+      object.scale.copy(object.userData.revealScale).multiplyScalar(reveal);
+    } else {
+      object.visible = treeVisible;
+      object.scale.copy(object.userData.revealScale);
+    }
+  });
   halo.visible = treeReveal > .2;
-  star.visible = treeVisible;
-  starLight.visible = treeVisible;
+  const starReveal = state.charmPhase === 'formingTree' ? THREE.MathUtils.smoothstep(treeFormationProgress, .94, 1) : treeVisible ? 1 : 0;
+  star.visible = starReveal > .01;
+  star.scale.setScalar((.94 + .08 * pulse) * starReveal);
+  starLight.visible = starReveal > .01;
+  starLight.intensity = (4.6 + 1.5 * pulse) * starReveal;
   floor.visible = treeReveal > .55;
   groundMaterial.opacity = (.6 + .08 * Math.sin(time * .7)) * (1 - state.spread * .92) * treeReveal;
   aura.material.opacity = (.13 + .06 * pulse) * treeReveal;
@@ -1215,7 +1236,7 @@ function animate() {
     textCloud.scale.setScalar(THREE.MathUtils.lerp(baseScale, heartScale, heartMix));
     textMaterial.size = 2.8 + .9 * heartMix + .25 * Math.sin(time * 2.4) * heartMix;
     if (state.charmPhase === 'formingGreeting') textMaterial.opacity = .96 * morphEase;
-    else if (state.charmPhase === 'formingTree') textMaterial.opacity = state.treeRevealFromHeart ? .96 * (1 - morphEase) : 0;
+    else if (state.charmPhase === 'formingTree') textMaterial.opacity = state.treeRevealFromHeart ? .96 * (1 - dissolveProgress) : 0;
     else textMaterial.opacity = .82 + .18 * heartMix;
     for (let i = 0; i < TEXT_COUNT * 3; i++) {
       const shimmer = .82 + .18 * Math.sin(time * 2.6 + Math.floor(i / 3) * .021) * heartMix;
@@ -1243,7 +1264,7 @@ function animate() {
       textPositionAttr.needsUpdate = true;
     }
   } else textMaterial.opacity = 0;
-  const heartSparkMix = ['formingHeart', 'heart'].includes(state.charmPhase) ? (state.charmPhase === 'heart' ? 1 : morphEase) : state.charmPhase === 'formingTree' && state.treeRevealFromHeart ? 1 - morphEase : 0;
+  const heartSparkMix = ['formingHeart', 'heart'].includes(state.charmPhase) ? (state.charmPhase === 'heart' ? 1 : morphEase) : state.charmPhase === 'formingTree' && state.treeRevealFromHeart ? 1 - dissolveProgress : 0;
   heartSparkles.visible = heartSparkMix > .01;
   heartSparkles.position.set(textCloud.position.x, textCloud.position.y, 0);
   heartSparkles.scale.setScalar(textCloud.scale.x);
