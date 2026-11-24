@@ -840,16 +840,23 @@ $('#removePhoto').addEventListener('click', async () => {
 const dialog = $('#messageDialog');
 const recipientInput = $('#recipientInput');
 const noteInput = $('#noteInput');
+const defaultRecipient = '我最爱的闺蜜';
+const defaultNote = '愿我最爱的闺蜜，做自己想做的事情，永远不会被这现世所束缚，永远开心快乐——爱你的闺蜜';
 function loadDedication() {
   const saved = JSON.parse(localStorage.getItem('our-little-universe-note') || 'null');
   if (!saved) return;
+  if (saved.recipient === '最喜欢的你' && saved.note === '把这一年的星光，都留给你。') {
+    saved.recipient = defaultRecipient;
+    saved.note = defaultNote;
+    localStorage.setItem('our-little-universe-note', JSON.stringify(saved));
+  }
   recipientInput.value = saved.recipient;
   noteInput.value = saved.note;
-  titleText.textContent = `给${saved.recipient}`;
+  titleText.textContent = `祝${saved.recipient}`;
   messageText.textContent = saved.note;
 }
 function openMessageEditor() {
-  recipientInput.value = titleText.textContent.replace(/^给/, '');
+  recipientInput.value = titleText.textContent.replace(/^祝/, '');
   noteInput.value = messageText.textContent;
   dialog.showModal();
 }
@@ -858,9 +865,9 @@ $('#messageButton').addEventListener('click', openMessageEditor);
 $('#cancelMessage').addEventListener('click', () => dialog.close());
 $('#messageForm').addEventListener('submit', (e) => {
   e.preventDefault();
-  const recipient = recipientInput.value.trim() || '最喜欢的你';
-  const note = noteInput.value.trim() || '把这一年的星光，都留给你。';
-  titleText.textContent = `给${recipient}`;
+  const recipient = recipientInput.value.trim() || defaultRecipient;
+  const note = noteInput.value.trim() || defaultNote;
+  titleText.textContent = `祝${recipient}`;
   messageText.textContent = note;
   localStorage.setItem('our-little-universe-note', JSON.stringify({ recipient, note }));
   dialog.close();
