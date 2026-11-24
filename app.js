@@ -808,16 +808,88 @@ function applySpread(on) {
   $('#sceneCaption').style.opacity = on ? '.5' : '1';
   if (state.charmPhase === 'scattered' && !on) state.charmPhase = 'idle';
 }
+let playbackRun = 0;
+let playbackPaused = false;
+function setPlaybackButton(mode) {
+  const button = $('#playbackToggle');
+  const icon = $('#playbackIcon');
+  const label = $('#playbackLabel');
+  const playing = mode === 'playing';
+  const paused = mode === 'paused';
+  button.setAttribute('aria-pressed', String(playing || paused));
+  button.setAttribute('aria-label', playing ? '暂停播放' : paused ? '继续播放' : '从头播放');
+  icon.textContent = playing ? 'Ⅱ' : '▶';
+  label.textContent = playing ? '暂停' : paused ? '继续' : '从头播放';
+}
+function cancelPlayback() {
+  playbackRun += 1;
+  playbackPaused = false;
+  setPlaybackButton('stopped');
+}
+function waitPlayback(ms, run) {
+  let remaining = ms;
+  let last = performance.now();
+  return new Promise((resolve) => {
+    const tick = () => {
+      const now = performance.now();
+      if (run !== playbackRun) return resolve(false);
+      if (!playbackPaused) remaining -= now - last;
+      last = now;
+      if (remaining <= 0) return resolve(true);
+      window.setTimeout(tick, 50);
+    };
+    tick();
+  });
+}
+async function waitForFormation(phase, run) {
+  while (run === playbackRun && state.charmPhase === phase) {
+    if (!await waitPlayback(80, run)) return false;
+  }
+  return run === playbackRun;
+}
+async function runStoryPlayback(run) {
+  scatterParticles(true);
+  showToast('演出即将开始');
+  if (!await waitPlayback(1800, run)) return;
+  beginGreeting();
+  if (!await waitForFormation('formingGreeting', run) || !await waitPlayback(1500, run)) return;
+  beginHeartCharm();
+  if (!await waitForFormation('formingHeart', run) || !await waitPlayback(2200, run)) return;
+  launchTreeReveal();
+  if (!await waitForFormation('formingTree', run)) return;
+  if (run === playbackRun) {
+    setPlaybackButton('stopped');
+    showToast('圣诞树已点亮');
+  }
+}
+$('#playbackToggle').addEventListener('click', () => {
+  if (playbackPaused) {
+    playbackPaused = false;
+    setPlaybackButton('playing');
+    return;
+  }
+  if ($('#playbackToggle').getAttribute('aria-pressed') === 'true') {
+    playbackPaused = true;
+    setPlaybackButton('paused');
+    return;
+  }
+  cancelPlayback();
+  const run = playbackRun;
+  playbackPaused = false;
+  setPlaybackButton('playing');
+  runStoryPlayback(run);
+});
 function advanceScene() {
+  cancelPlayback();
   if (state.charmPhase === 'idle') scatterParticles();
   else if (state.charmPhase === 'scattered') beginGreeting();
   else if (state.charmPhase === 'greeting') beginHeartCharm();
   else if (state.charmPhase === 'heart') launchTreeReveal();
   else if (state.charmPhase === 'tree') nextPhoto(1);
 }
-$('#bloomTree').addEventListener('click', () => applySpread(state.spreadTarget < .5));
-$('#gatherTree').addEventListener('click', () => applySpread(false));
-$('#cyclePhoto').addEventListener('click', () => nextPhoto(1));
+$('#bloomTree').addEventListener('click', () => { cancelPlayback(); applySpread(state.spreadTarget < .5); });
+$('#gatherTree').addEventListener('click', () => { cancelPlayback(); applySpread(false); });
+$('#cyclePhoto').addEventListener('click', () => { cancelPlayback(); nextPhoto(1); });
 $('#removePhoto').addEventListener('click', async () => {
   if (!photoObjects.length) return;
   const index = state.selectedPhoto;
@@ -1072,7 +1144,8 @@ window.addEventListener('pagehide', stopCamera);
 
 function animate() {
   requestAnimationFrame(animate);
-  const time = clock.getElapsedTime();
+  const delta = Math.min(clock.getDelta(), .05);
+  const time = clock.elapsedTime;
   state.spread += (state.spreadTarget - state.spread) * .055;
   const pulse = .86 + .14 * Math.sin(time * 2.1);
   halo.material.opacity = .52 + .22 * pulse;
@@ -1087,8 +1160,9 @@ function animate() {
   ribbonMaterial.opacity = .77 + .13 * Math.sin(time * 1.7);
   aura.material.opacity = .13 + .06 * pulse;
   const mix = state.spread;
-  if (['formingGreeting', 'formingHeart', 'formingTree'].includes(state.charmPhase)) {
-    state.textProgress = Math.min(1, state.textProgress + .024);
+  if (!playbackPaused && ['formingGreeting', 'formingHeart', 'formingTree'].includes(state.charmPhase)) {
+    const duration = state.charmPhase === 'formingGreeting' ? 2.8 : state.charmPhase === 'formingHeart' ? 3.4 : 10.5;
+    state.textProgress = Math.min(1, state.textProgress + delta / duration);
     if (state.textProgress >= 1) {
       if (state.charmPhase === 'formingHeart') {
         state.charmPhase = 'heart';
@@ -1110,10 +1184,11 @@ function animate() {
   else if (['greeting', 'formingHeart', 'heart'].includes(state.charmPhase)) pointMaterial.opacity = .3;
   else pointMaterial.opacity = .91;
   const formationProgress = THREE.MathUtils.clamp(1 - state.spread, 0, 1);
+  const treeFormationProgress = state.charmPhase === 'formingTree' ? state.textProgress : formationProgress;
   const showCharm = ['formingGreeting', 'greeting', 'formingHeart', 'heart', 'formingTree'].includes(state.charmPhase);
   const treeParticlesVisible = ['scattered', 'formingGreeting', 'formingTree', 'idle', 'tree'].includes(state.charmPhase);
   const treeReveal = state.charmPhase === 'formingTree'
-    ? THREE.MathUtils.smoothstep(formationProgress, .42, .82)
+    ? THREE.MathUtils.smoothstep(state.textProgress, .04, .98)
     : state.charmPhase === 'idle' || state.charmPhase === 'tree' ? 1 : 0;
   const treeVisible = treeReveal > .72;
   const photosVisible = state.charmPhase === 'idle' || state.charmPhase === 'tree';
@@ -1198,7 +1273,7 @@ function animate() {
     let pointMix = mix;
     if (state.charmPhase === 'formingTree') {
       const height = THREE.MathUtils.clamp((home[j + 1] + HEIGHT * .5) / HEIGHT, 0, 1);
-      const local = THREE.MathUtils.clamp((formationProgress - height * .72) / .28, 0, 1);
+      const local = THREE.MathUtils.clamp((treeFormationProgress - height * .72) / .28, 0, 1);
       pointMix = local * local * (3 - 2 * local);
     }
     const shimmer = 1 + .04 * Math.sin(time * 1.5 + phases[i]);
