@@ -682,15 +682,21 @@ const BUNDLED_PHOTOS = [
   'fce464cf56db0071e2a057ebd5589300.jpg',
 ];
 async function loadBundledPhotos() {
-  const images = await Promise.all(BUNDLED_PHOTOS.map((file) => new Promise((resolve, reject) => {
+  let loadedCount = 0;
+  await Promise.all(BUNDLED_PHOTOS.map((file, index) => new Promise((resolve) => {
     const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
+    image.onload = () => {
+      loadedCount += 1;
+      createPhotoObject(image, `闺蜜回忆 ${String(index + 1).padStart(2, '0')}.jpg`, `bundled-${index + 1}`, null);
+      resolve();
+    };
+    image.onerror = () => {
+      console.warn('Could not load bundled photo:', file);
+      resolve();
+    };
     image.src = new URL(`photos/${file}`, import.meta.url).href;
   })));
-  images.forEach((image, index) => {
-    createPhotoObject(image, `闺蜜回忆 ${String(index + 1).padStart(2, '0')}.jpg`, `bundled-${index + 1}`, null);
-  });
+  if (!loadedCount) showToast('照片暂时没加载出来，请刷新页面重试');
 }
 async function restorePhotos() {
   try { await loadBundledPhotos(); }
