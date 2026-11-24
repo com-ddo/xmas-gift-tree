@@ -64,8 +64,9 @@ function resize() {
   }
   snowPositionAttr.needsUpdate = true;
   if (aspect < 0.8) {
-    tree.position.set(0, -1.1, 0);
-    tree.scale.setScalar(.9);
+    const portraitTreeScale = THREE.MathUtils.clamp(.7 + (h - 640) * .00095, .68, .9);
+    tree.position.set(0, -1.3 - (portraitTreeScale - .7) * 2.5, 0);
+    tree.scale.setScalar(portraitTreeScale);
     textAnchorX = 0;
     textCloud.scale.setScalar(.55);
     groundRoot.scale.set(.58, .68, 1);
@@ -638,7 +639,6 @@ function focusPhoto(index = state.selectedPhoto) {
   if (!photoObjects.length) { showToast('先加入一张你们的照片吧'); return; }
   state.selectedPhoto = (index + photoObjects.length) % photoObjects.length;
   state.photoFocus = true;
-  $('#experience').classList.add('photo-focus');
   state.spreadTarget = 0;
   photoObjects.forEach((p, i) => {
     p.userData.selected = i === state.selectedPhoto;
@@ -648,7 +648,6 @@ function focusPhoto(index = state.selectedPhoto) {
 }
 function dismissFocus() {
   state.photoFocus = false;
-  $('#experience').classList.remove('photo-focus');
   photoObjects.forEach((p) => { p.userData.selected = false; p.userData.targetOpacity = .98; });
 }
 function nextPhoto(step = 1) {
@@ -1365,13 +1364,13 @@ function animate() {
     p.renderOrder = focus ? 20 : 0;
     const portrait = window.innerWidth / window.innerHeight < .8;
     const targetPos = focus
-      ? new THREE.Vector3(portrait ? 3.6 : -4.1, portrait ? .35 : .2, 5.2)
+      ? new THREE.Vector3(portrait ? 1.15 / tree.scale.x : -4.1, portrait ? -2.75 : .2, 5.2)
       : p.userData.basePosition;
-    p.position.lerp(targetPos, focus ? .08 : .09);
+    p.position.lerp(targetPos, 1 - Math.exp(-delta * (focus ? 5.5 : 6)));
     const targetScale = focus
-      ? new THREE.Vector3(portrait ? 3 : 3.3, portrait ? 3.75 : 4.12, 1)
+      ? new THREE.Vector3(portrait ? 2.65 / tree.scale.x : 3.3, portrait ? 3.3 / tree.scale.y : 4.12, 1)
       : p.userData.baseScale;
-    p.scale.lerp(targetScale, .1);
+    p.scale.lerp(targetScale, 1 - Math.exp(-delta * 6));
     p.material.rotation = focus ? 0 : Math.sin(time * .7 + i) * .025;
   }
   const stars = scene.userData.stars;
