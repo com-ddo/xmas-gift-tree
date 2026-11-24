@@ -246,6 +246,7 @@ const textShape = new Float32Array(TEXT_COUNT * 3);
 const heartShape = new Float32Array(TEXT_COUNT * 3);
 const textCurrent = new Float32Array(TEXT_COUNT * 3);
 const textColors = new Float32Array(TEXT_COUNT * 3);
+const heartBurstVelocity = new Float32Array(TEXT_COUNT * 3);
 const greetingColors = new Float32Array(TEXT_COUNT * 3);
 const heartColors = new Float32Array(TEXT_COUNT * 3);
 const textCanvas = document.createElement('canvas');
@@ -295,6 +296,11 @@ for (let i = 0; i < TEXT_COUNT; i++) {
   heartShape[j] = ((heartPixel[0] + (rand() - .5) * 4) / heartCanvas.width - .5) * 12;
   heartShape[j + 1] = (.5 - (heartPixel[1] + (rand() - .5) * 4) / heartCanvas.height) * 4.2;
   heartShape[j + 2] = 4.35 + rand() * .95;
+  const burstAngle = rand() * Math.PI * 2;
+  const burstSpeed = 1.2 + rand() * 2.4;
+  heartBurstVelocity[j] = Math.cos(burstAngle) * burstSpeed;
+  heartBurstVelocity[j + 1] = Math.sin(burstAngle) * burstSpeed;
+  heartBurstVelocity[j + 2] = (rand() - .5) * 1.2;
   textStart[j] = (rand() - .5) * 10.5;
   textStart[j + 1] = (rand() - .5) * 5.7;
   textStart[j + 2] = 1.2 + rand() * 7.2;
@@ -614,7 +620,7 @@ function createPhotoObject(image, name, id, blob) {
   const a = -1.15 + (photoObjects.length % 5) * .5;
   const r = MAX_R * (1 - t) * .88;
   sprite.position.set(Math.sin(a) * r, (t - .5) * HEIGHT, Math.cos(a) * r + .28);
-  sprite.userData = { photoId: id, basePosition: sprite.position.clone(), baseScale: sprite.scale.clone(), selected: false, name };
+  sprite.userData = { photoId: id, basePosition: sprite.position.clone(), baseScale: sprite.scale.clone(), selected: false, targetOpacity: .98, name };
   tree.add(sprite);
   photoObjects.push(sprite);
   memories.push({ id, name, blob });
@@ -632,16 +638,18 @@ function focusPhoto(index = state.selectedPhoto) {
   if (!photoObjects.length) { showToast('先加入一张你们的照片吧'); return; }
   state.selectedPhoto = (index + photoObjects.length) % photoObjects.length;
   state.photoFocus = true;
+  $('#experience').classList.add('photo-focus');
   state.spreadTarget = 0;
   photoObjects.forEach((p, i) => {
     p.userData.selected = i === state.selectedPhoto;
-    p.material.opacity = i === state.selectedPhoto ? 1 : .08;
+    p.userData.targetOpacity = i === state.selectedPhoto ? 1 : .08;
   });
   updatePhotoUI();
 }
 function dismissFocus() {
   state.photoFocus = false;
-  photoObjects.forEach((p) => { p.userData.selected = false; p.material.opacity = .98; });
+  $('#experience').classList.remove('photo-focus');
+  photoObjects.forEach((p) => { p.userData.selected = false; p.userData.targetOpacity = .98; });
 }
 function nextPhoto(step = 1) {
   if (!photoObjects.length) { showToast('先加入一张你们的照片吧'); return; }
@@ -800,6 +808,7 @@ function resetCharm() {
   state.fireworkProgress = 1;
   textMaterial.opacity = 0;
   pointMaterial.opacity = .91;
+  dismissFocus();
   applySpread(false);
   setGestureText(gestureLabel('none'));
 }
@@ -862,9 +871,21 @@ async function runStoryPlayback(run) {
   if (!await waitForFormation('formingHeart', run) || !await waitPlayback(1600, run)) return;
   launchTreeReveal();
   if (!await waitForFormation('formingTree', run)) return;
+  if (photoObjects.length) {
+    showToast('圣诞树已点亮，回忆即将逐张展开');
+    if (!await waitPlayback(1000, run)) return;
+    setGestureText('回忆正在逐张亮相');
+    for (let i = 0; i < photoObjects.length; i++) {
+      if (run !== playbackRun) return;
+      focusPhoto(i);
+      if (!await waitPlayback(2500, run)) return;
+    }
+    dismissFocus();
+    if (!await waitPlayback(1200, run)) return;
+  }
   if (run === playbackRun) {
     setPlaybackButton('stopped');
-    showToast('圣诞树已点亮');
+    showToast(photoObjects.length ? `${photoObjects.length} 张回忆已依次亮相` : '圣诞树已点亮');
   }
 }
 $('#playbackToggle').addEventListener('click', () => {
@@ -1187,6 +1208,7 @@ function animate() {
   const morphEase = state.textProgress * state.textProgress * (3 - 2 * state.textProgress);
   if (state.charmPhase === 'formingGreeting') pointMaterial.opacity = .91 * (1 - morphEase);
   else if (['greeting', 'formingHeart', 'heart'].includes(state.charmPhase)) pointMaterial.opacity = .3;
+  else if (state.charmPhase === 'formingTree' && state.treeRevealFromHeart) pointMaterial.opacity = .91 * THREE.MathUtils.smoothstep(state.textProgress, .18, .3);
   else pointMaterial.opacity = .91;
   const formationProgress = THREE.MathUtils.clamp(1 - state.spread, 0, 1);
   const treeDissolveDelay = state.treeRevealFromHeart ? .18 : 0;
@@ -1259,9 +1281,11 @@ function animate() {
           textCurrent[j + 1] = textShape[j + 1] + (heartShape[j + 1] - textShape[j + 1]) * morphEase;
           textCurrent[j + 2] = textShape[j + 2] + (heartShape[j + 2] - textShape[j + 2]) * morphEase;
         } else if (state.charmPhase === 'formingTree') {
-          textCurrent[j] = heartShape[j] + (textStart[j] - heartShape[j]) * morphEase;
-          textCurrent[j + 1] = heartShape[j + 1] + (textStart[j + 1] - heartShape[j + 1]) * morphEase;
-          textCurrent[j + 2] = heartShape[j + 2] + (textStart[j + 2] - heartShape[j + 2]) * morphEase;
+          const burst = THREE.MathUtils.smoothstep(state.textProgress, 0, .18);
+          const expansion = 1 + burst * 1.25;
+          textCurrent[j] = heartShape[j] * expansion + heartBurstVelocity[j] * burst;
+          textCurrent[j + 1] = heartShape[j + 1] * expansion + heartBurstVelocity[j + 1] * burst;
+          textCurrent[j + 2] = heartShape[j + 2] + heartBurstVelocity[j + 2] * burst;
         }
       }
       textPositionAttr.needsUpdate = true;
@@ -1285,9 +1309,13 @@ function animate() {
     const p = state.fireworkProgress;
     for (let i = 0; i < FIREWORK_COUNT; i++) {
       const j = i * 3;
-      fireworkPositions[j] = fireworkCenters[j] + fireworkVelocity[j] * p * 1.25;
-      fireworkPositions[j + 1] = fireworkCenters[j + 1] + fireworkVelocity[j + 1] * p * 1.25 - p * p * 1.5;
-      fireworkPositions[j + 2] = fireworkCenters[j + 2] + fireworkVelocity[j + 2] * p;
+      const fromHeart = state.charmPhase === 'formingTree' && state.treeRevealFromHeart && i < FIREWORK_COUNT * .72;
+      const originX = fromHeart ? textCloud.position.x : fireworkCenters[j];
+      const originY = fromHeart ? textCloud.position.y : fireworkCenters[j + 1];
+      const originZ = fromHeart ? 5.2 : fireworkCenters[j + 2];
+      fireworkPositions[j] = originX + fireworkVelocity[j] * p * 1.25;
+      fireworkPositions[j + 1] = originY + fireworkVelocity[j + 1] * p * 1.25 - p * p * 1.5;
+      fireworkPositions[j + 2] = originZ + fireworkVelocity[j + 2] * p;
     }
     fireworkPositionAttr.needsUpdate = true;
     fireworkMaterial.opacity = Math.sin(Math.PI * p) * .96;
@@ -1335,10 +1363,15 @@ function animate() {
     p.visible = photosVisible;
     const focus = state.photoFocus && i === state.selectedPhoto;
     p.renderOrder = focus ? 20 : 0;
-    const targetPos = focus ? new THREE.Vector3(0, 1.0, 5.2) : p.userData.basePosition;
-    p.position.lerp(targetPos, focus ? .13 : .09);
-    const targetScale = focus ? new THREE.Vector3(4.6, 5.75, 1) : p.userData.baseScale;
-    p.scale.lerp(targetScale, .12);
+    const portrait = window.innerWidth / window.innerHeight < .8;
+    const targetPos = focus
+      ? new THREE.Vector3(portrait ? 3.6 : -4.1, portrait ? .35 : .2, 5.2)
+      : p.userData.basePosition;
+    p.position.lerp(targetPos, focus ? .08 : .09);
+    const targetScale = focus
+      ? new THREE.Vector3(portrait ? 3 : 3.3, portrait ? 3.75 : 4.12, 1)
+      : p.userData.baseScale;
+    p.scale.lerp(targetScale, .1);
     p.material.rotation = focus ? 0 : Math.sin(time * .7 + i) * .025;
   }
   const stars = scene.userData.stars;

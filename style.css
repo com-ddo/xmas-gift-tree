@@ -36,7 +36,7 @@ button:focus-visible, label:focus-visible, input:focus-visible, textarea:focus-v
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #7a7763; box-shadow: 0 0 0 3px rgba(122, 119, 99, .14); }
 .camera-button[aria-pressed="true"] .live-dot { background: #99c49b; box-shadow: 0 0 0 3px rgba(153, 196, 155, .13), 0 0 12px rgba(153, 196, 155, .65); }
 
-.dedication { position: absolute; z-index: 2; left: clamp(42px, 7.2vw, 112px); top: 32%; width: min(400px, 32vw); transform: translateY(-30%); color: var(--ink); pointer-events: none; }
+.dedication { position: absolute; z-index: 2; left: clamp(42px, 7.2vw, 112px); top: 32%; width: min(400px, 32vw); transform: translateY(-30%); color: var(--ink); pointer-events: none; transition: opacity .35s ease; }
 .eyebrow { color: #c3a77f; font-size: 9px; font-weight: 600; letter-spacing: 3px; margin: 0 0 18px; }
 .dedication h1 { margin: 0; max-width: 390px; color: #fff6e8; font-family: Georgia, 'Noto Serif SC', serif; font-size: 42px; font-weight: 400; line-height: 1.32; text-shadow: 0 2px 28px rgba(238, 180, 108, .16); }
 .dedication-copy { margin: 20px 0 0; color: #d6c1a8; font-family: 'Noto Serif SC', Georgia, serif; font-size: 17px; line-height: 1.8; }
